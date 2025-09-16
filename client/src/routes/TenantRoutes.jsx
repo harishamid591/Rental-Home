@@ -9,7 +9,7 @@ const TenantRoutes = ()=>{
             <Route
                 path="/dashboard"
                 element={
-                    <ProtectedRoute allowedRoles={["TENANT"]}>
+                    <ProtectedRoute allowedRoles={["tenant"]}>
                         <Dashboard />
                     </ProtectedRoute>
                 }

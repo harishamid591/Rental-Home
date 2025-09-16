@@ -1,16 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { setUser } from "../features/auth/authSlice";
 import { useNavigate } from "react-router-dom";
 import { API_URI } from "../utils/constants";
+
 
 const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  const { user } = useSelector((state) => state.auth);
+
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+
+    
+  useEffect(() => {
+    if (user) {
+      if (user.role === "admin") navigate("/admin/dashboard");
+      else if (user.role === "tenant") navigate("/dashboard");
+      else navigate("/");
+    }
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -27,16 +39,20 @@ const LoginPage = () => {
         { withCredentials: true }
       );
 
+
       dispatch(setUser(res.data));
+
        // Role-based redirect
-       if (res.data.role === "ADMIN") navigate("/admin/dashboard");
-       else if (res.data.role === "TENANT") navigate("/dashboard");
+       if (res.data.role === "admin") navigate("/admin/dashboard");
+       else if (res.data.role === "tenant") navigate("/dashboard");
        else navigate("/"); // fallback
 
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
     }
   };
+
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-blue-300 p-4">

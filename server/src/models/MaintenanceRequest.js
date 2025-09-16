@@ -2,55 +2,16 @@ import mongoose from "mongoose";
 const {Schema, model} = mongoose;
 
 
-const maintenanceSchema = new Schema({
-    tenantUserId:{
-        type:Schema.Types.ObjectId,
-        ref:"User",
-        required:true
+const maintenanceSchema = new Schema(
+    {
+      villaId: { type: mongoose.Schema.Types.ObjectId, ref: "Villa", required: true },
+      houseId: { type: mongoose.Schema.Types.ObjectId, ref: "House", required: true },
+      tenantName: { type: String },
+      date: { type: Date, required: true },
+      issue: { type: String, required: true },
+      cost: { type: Number, required: true },
     },
-    houseId:{
-        type:Schema.Types.ObjectId,
-        ref:"House",
-        required:true
-    },
-    category:{
-        type:String,
-        enum:["AC","Plumbing","Electrical","Painting","Other"],
-        required:true
-    },
-    title:{
-        type:String,
-    },
-    description:{
-        type:String
-    },
-    image:[String],
-    priority:{
-        type:String,
-        enum:["low","normal",high],
-        default:"normal"
-    },
-    status:{
-        type:String,
-        enum:["pending","in_progress","completed","rejected"],
-    },
-    assignedToUserId:{
-        type:Schema.Types.ObjectId,
-        ref:"User",
-        default:null
-    },
-    openedAt:{
-        type:Date,
-        default:Date.now()
-    },
-    updateAt:{
-        type:Date
-    },
-    closedAt:{
-        type:Date
-    }
-},{
-    timestamps:true
-})
+    { timestamps: true }
+  );
 
 export const MaintenanceRequest = model("MaintenanceRequest",maintenanceSchema);

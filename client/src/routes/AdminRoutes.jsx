@@ -8,8 +8,8 @@ import HouseList from "../pages/admin/Houses/HouseList";
 import TenantList from "../pages/admin/Tenants/TenantList";
 import RentStatus from "../pages/admin/Rentals/RentStatus";
 import MaintenanceList from "../pages/admin/Maintenance/MaintenanceList";
-import Notifications from "../pages/admin/Notifications";
 import Analytics from "../pages/admin/Analytics";
+import ElectricityPage from "../pages/admin/ElectricityPage";
 
 
 const AdminRoutes = () => {
@@ -17,7 +17,7 @@ const AdminRoutes = () => {
     <Routes>
       <Route
         element={
-          <ProtectedRoute allowedRoles={["ADMIN"]}>
+          <ProtectedRoute allowedRoles={["admin"]}>
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -28,7 +28,7 @@ const AdminRoutes = () => {
         <Route path="tenants" element={<TenantList />} />
         <Route path="rentals" element={<RentStatus />} />
         <Route path="maintenance" element={<MaintenanceList />} />
-        <Route path="notifications" element={<Notifications />} />
+        <Route path="electricity" element={<ElectricityPage />} />
         <Route path="analytics" element={<Analytics />} />
       </Route>
     </Routes>

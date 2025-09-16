@@ -23,10 +23,9 @@ export const register = async(req,res)=>{
 
         const token = generateToken(user);
 
-        console.log(process.env.NODE_ENV)
 
         res.cookie("token",token,{
-            httpOnly:true,
+            httpOnly:false,
             secure: process.env.NODE_ENV === "production",
             sameSite:"strict"
         })
@@ -58,9 +57,9 @@ export const login = async(req,res)=>{
 
 
         res.cookie("token", token, {
-          httpOnly: true,
+          httpOnly: false,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "strict",
+          sameSite: "strict"
         });
 
 
@@ -79,7 +78,7 @@ export const login = async(req,res)=>{
 // POST /api/auth/logout
 export const logout = (req, res) => {
     res.clearCookie("token", {
-      httpOnly: true,
+      httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
     });

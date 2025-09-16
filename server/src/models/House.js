@@ -12,10 +12,6 @@ const houseSchema = new Schema({
         type:String,
         required:true
     },
-    floor:{
-        type:Number,
-        required:true
-    },
     bedrooms:{
         type:Number,
     },
@@ -32,12 +28,11 @@ const houseSchema = new Schema({
         type:Number,
         required:true
     },
-    dueDay:{
-        type:Number,
-        min:1,
-        max:28,
-        required:true
-    }
 },{timestamps:true});
+
+houseSchema.pre("save", function (next) {
+    this.isOccupied = !!this.currentTenantUserId; // true if tenant is assigned
+    next();
+  });
 
 export const House = model("House",houseSchema);

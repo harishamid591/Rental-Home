@@ -6,14 +6,22 @@ import cookieParser from "cookie-parser";
 
 import authRoutes from "./routes/authRoutes.js";
 import villaRoutes from "./routes/villaRoutes.js";
+import houseRoutes from "./routes/houseRoutes.js";
+import tenantRoutes from "./routes/tenantRoutes.js";
+import rentalRoutes from "./routes/rentalRoutes.js";
+import maintenanceRoutes from "./routes/maintenanceRoutes.js";
+import electricityRoutes from "./routes/electricityRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 
 const app = express();
 
 
+app.use(cors({origin:"http://localhost:5173", credentials:true}));
+
 app.use(helmet());
 app.use(cookieParser());
-app.use(cors({origin:"http://localhost:5173", credentials:true}));
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -22,5 +30,12 @@ app.use(morgan("dev"));
 // Routes
 app.use('/api/auth',authRoutes);
 app.use("/api/villas", villaRoutes);
+app.use("/api/houses", houseRoutes);
+app.use("/api/tenantProfiles", tenantRoutes);
+app.use("/api/rentals", rentalRoutes);
+app.use("/api/maintenance",maintenanceRoutes)
+app.use("/api/electricity",electricityRoutes)
+app.use("/api/reports",reportRoutes)
+app.use("/api/adminDashboard",dashboardRoutes)
 
 export default app;

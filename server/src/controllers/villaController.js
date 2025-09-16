@@ -1,12 +1,20 @@
+import Joi from "joi";
 import { Villa } from "../models/Villa.js";
 
+
+// Validation schemas
+const addVillaSchema = Joi.object({
+  name: Joi.string().trim().required(),
+  location: Joi.string().trim().required(),
+  price: Joi.number().min(0).required(),
+});
 
 // Get all villas
 export const getVillas = async (req, res) => {
   try {
-    const villas = await Villa.find().sort({ createdAt: -1 }); // newest first
+    const villas = await Villa.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }); // newest first
 
-    res.json(villas);
+    return res.json(villas);
   } catch (err) {
     console.error("Get Villas Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -16,20 +24,15 @@ export const getVillas = async (req, res) => {
 // Add new villa
 export const addVilla = async (req, res) => {
   try {
+    const { error, value } = addVillaSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
-    const { name, location, price } = req.body;
-
-    if (!name || !location || !price) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const villa = new Villa({ name, location, price });
+    const villa = new Villa(value);
     await villa.save();
-
-    res.status(201).json(villa);
+    return res.status(201).json(villa);
   } catch (err) {
-    console.error("Add Villa Error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Add Villa Error:", err.message);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -38,11 +41,14 @@ export const addVilla = async (req, res) => {
 export const deleteVilla = async (req, res) => {
   try {
     const { id } = req.params;
-    const villa = await Villa.findByIdAndDelete(id);
+    const villa = await Villa.findById(id);
 
-    if (!villa) {
-      return res.status(404).json({ message: "Villa not found" });
+    if (!villa || villa.isDeleted) {
+      return res.status(404).json({ success: false, message: "Villa not found" });
     }
+
+    villa.isDeleted = true;
+    await villa.save();
 
     res.json({ message: "Villa deleted successfully" });
   } catch (err) {
@@ -51,23 +57,23 @@ export const deleteVilla = async (req, res) => {
   }
 };
 
+const updateVillaSchema = Joi.object({
+  name: Joi.string().trim().optional(),
+  location: Joi.string().trim().optional(),
+  price: Joi.number().min(0).optional(),
+});
 
 // Update villa
 export const updateVilla = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, location, price } = req.body;
+    const { error, value } = updateVillaSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
-    const villa = await Villa.findByIdAndUpdate(
-      id,
-      { name, location, price },
-      { new: true, runValidators: true }
-    );
+    const villa = await Villa.findByIdAndUpdate(id, value, { new: true, runValidators: true });
+    if (!villa) return res.status(404).json({ success: false, message: "Villa not found" });
 
-    if (!villa) {
-      return res.status(404).json({ message: "Villa not found" });
-    }
-
+  
     res.json({ message: "Villa updated successfully",villa});
   } catch (err) {
     console.error("Update Villa Error:", err);

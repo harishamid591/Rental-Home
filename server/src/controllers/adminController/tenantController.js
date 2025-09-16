@@ -1,18 +1,26 @@
 import bcrypt from "bcryptjs";
+import Joi from "joi";
 import { User } from "../../models/User.js";
 import { TenantProfile } from "../../models/TenantProfile.js";
 import { House } from "../../models/House.js";
 
 
+const createSchema = Joi.object({
+  name: Joi.string().required(),
+  role: Joi.string().valid("tenant", "admin").required(),
+  qatarId: Joi.string().required(),
+  contact: Joi.string().required(),
+  assignedHouseId: Joi.string().allow(null, ""),
+  startDate: Joi.date().optional(),
+});
 
 // POST /api/tenantProfiles/createTenant
 export const createTenant = async (req, res) => {
   try {
-    const { name, role, qatarId, contact, assignedHouseId, startDate } = req.body;
+    const { error, value } = createSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
-    if (!name || !role || !qatarId) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+    const { name, role, qatarId, contact, assignedHouseId, startDate } = value;
 
     const email = `${contact}@gmail.com`;
     const password = contact; 
@@ -40,15 +48,15 @@ export const createTenant = async (req, res) => {
         contact,
         assignedHouseId: assignedHouseId || null,
         startDate: startDate || new Date(),
+        isActive: true,
       });
-
       await tenantProfile.save();
 
       // Mark house occupied
       if (assignedHouseId) {
         const house = await House.findById(assignedHouseId);
-        if (!house) {
-          return res.status(404).json({ message: "House not found" });
+        if (!house || house.isDeleted) {
+          return res.status(404).json({ success: false, message: "House not found" });
         }
         if (house.currentTenantUserId) {
           return res.status(400).json({ message: "House already occupied" });
@@ -87,14 +95,14 @@ export const deleteTenant = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Mark tenant as deleted
-    await User.findByIdAndUpdate(id, { isDeleted: true });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    // 2. Mark tenant profile as inactive
-    await TenantProfile.findOneAndUpdate(
-      { userId: id },
-      { isActive: false, endDate: new Date() } // <-- set endDate
-    );
+    user.isDeleted = true;
+    await user.save();
+
+    // 1. Mark tenant as deleted
+    await TenantProfile.findOneAndUpdate({ userId: id }, { isActive: false, endDate: new Date() });
 
     // 3. Free up house
     const house = await House.findOne({ currentTenantUserId: id });
@@ -102,7 +110,6 @@ export const deleteTenant = async (req, res) => {
       house.currentTenantUserId = null;
       await house.save(); // ✅ pre-save hook runs → isOccupied = false
     }
-
 
     res.json({ message: "Tenant removed from active records successfully" });
   } catch (err) {
@@ -112,26 +119,15 @@ export const deleteTenant = async (req, res) => {
 };
 
   
-
 export const getTenants = async (req, res) => {
   try {
     // Find tenants and join their profile + house + villa in one go
-    const tenants = await User.find({ 
-      role: "tenant", 
-      isDeleted: { $ne: true } // exclude soft-deleted users
-    })
-    .select("-passwordHash")
-    .lean();
+    const tenants = await User.find({ role: "tenant", isDeleted: { $ne: true } }).select("-passwordHash").lean();
 
-    const profiles = await TenantProfile.find()
-      .populate({
-        path: "assignedHouseId",
-        populate: {
-          path: "villaId", // also fetch villa info
-          select: "name",  // only villa name
-        },
-      })
-      .lean();
+    const profiles = await TenantProfile.find({}).populate({
+      path: "assignedHouseId",
+      populate: { path: "villaId", select: "name" },
+    }).lean();
 
     // Merge users + profiles
     const tenantData = tenants.map((tenant) => {
@@ -152,12 +148,17 @@ export const getTenants = async (req, res) => {
   }
 };
 
+const updateSchema = Joi.object({
+  qatarId: Joi.string().optional(),
+  contact: Joi.string().optional(),
+});
 
 // Update tenant profile
 export const updateTenantProfile = async (req, res) => {
   try {
     const tenantId = req.params.id; // userId
-    const { qatarId, contact } = req.body;
+    const { error, value } = updateSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
     // 1. Find Tenant Profile
     const tenantProfile = await TenantProfile.findOne({ userId: tenantId });
@@ -175,28 +176,23 @@ export const updateTenantProfile = async (req, res) => {
       return res.status(400).json({ message: "Tenant is inactive/deleted" });
     }
     
-
-    // 3. Update Qatar ID
-    if (qatarId) {
-      tenantProfile.qatarId = qatarId;
-      user.qatarId = qatarId;
+    if (value.qatarId) {
+      tenantProfile.qatarId = value.qatarId;
+      user.qatarId = value.qatarId;
     }
 
     // 4. If contact changed
-    if (contact && contact !== tenantProfile.contact) {
-      tenantProfile.contact = contact;
-
-      const newEmail = `${contact}@gmail.com`;
-
+    
+    if (value.contact && value.contact !== tenantProfile.contact) {
+      tenantProfile.contact = value.contact;
+      const newEmail = `${value.contact}@gmail.com`;
       const existingUser = await User.findOne({ email: newEmail });
       if (existingUser && existingUser._id.toString() !== tenantId) {
-        return res.status(400).json({ message: "Email already in use" });
+        return res.status(400).json({ success: false, message: "Email already in use" });
       }
-
       user.email = newEmail;
-
       const salt = await bcrypt.genSalt(10);
-      user.passwordHash = await bcrypt.hash(contact, salt);
+      user.passwordHash = await bcrypt.hash(value.contact, salt);
     }
 
     await tenantProfile.save();

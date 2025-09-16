@@ -1,18 +1,26 @@
+import Joi from "joi";
 import { House } from "../../models/House.js";
 import { Villa } from "../../models/Villa.js";
+
+const createHouseSchema = Joi.object({
+  villaId: Joi.string().required(),
+  number: Joi.string().required(),
+  bedrooms: Joi.number().integer().min(0).optional(),
+  rentAmount: Joi.number().min(0).required(),
+});
 
 // controllers/houseController.js
 export const getHouses = async (req, res) => {
   try {
-    const { villaId } = req.query; // ⬅️ take villaId from query params
-
-    const filter = villaId ? { villaId } : {}; // if villaId is given, filter
+    const { villaId } = req.query; 
+    const filter = { isDeleted: { $ne: true } };
+    if (villaId) filter.villaId = villaId;
 
     const houses = await House.find(filter)
       .populate("villaId", "name location") // fetch villa info
       .populate("currentTenantUserId", "name email");
 
-    res.json(houses);
+    return res.json(houses);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -23,80 +31,69 @@ export const createHouses = async (req, res) => {
 
 try {
 
-    const { villaId, number, bedrooms, rentAmount } = req.body;
+  const { error, value } = createHouseSchema.validate(req.body);
+  if (error) return res.status(400).json({ success: false, message: error.message });
 
-
-    // ensure villa exists
-    const villa = await Villa.findById(villaId);
+    const villa = await Villa.findById(value.villaId);
   
-    if (!villa) return res.status(400).json({ message: "Invalid villa ID" });
+    if (!villa || villa.isDeleted) return res.status(400).json({ success: false, message: "Invalid villa ID" });
 
-    const house = new House({
-    villaId,
-    number,
-    bedrooms,
-    rentAmount,
-    });
+    const house = new House(value);
+    const saved = await house.save();
 
-    const savedHouse = await house.save();
+    const populatedHouse = await House.findById(saved._id).populate("villaId", "name location");
 
-    const populatedHouse = await House.findById(savedHouse._id).populate("villaId");
-
-    res.status(201).json(populatedHouse);
+    return res.status(201).json(populatedHouse);
 
 } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
 }
 };  
 
-// export const getHouseById = async (req, res) => {
-//     try {
-//       const house = await House.findById(req.params.id)
-//         .populate("villaId", "name location")
-//         .populate("currentTenantUserId", "name email");
-  
-//       if (!house) return res.status(404).json({ message: "House not found" });
-  
-//       res.json(house);
-//     } catch (error) {
-//       res.status(500).json({ message: "Server Error", error: error.message });
-//     }
-//   };
+const updateHouseSchema = Joi.object({
+  rentAmount: Joi.number().min(0).required(),
+});
+
 
 export const updateHouse = async (req, res) => {
   try {
-    const { rentAmount } = req.body;
 
-    if (rentAmount === undefined) {
+    const { id } = req.params;
+
+    const { error, value } = updateHouseSchema.validate(req.body, { stripUnknown: true });
+    if (error) return res.status(400).json({ success: false, message: error.message });
+
+    const house = await House.findById(id);
+    if (!house || house.isDeleted) return res.status(404).json({ success: false, message: "House not found" });
+
+    if (value.rentAmount === undefined) {
       return res.status(400).json({ message: "Rent amount is required" });
     }
 
-    const updatedHouse = await House.findByIdAndUpdate(
-      req.params.id,
-      { rentAmount },
-      { new: true }
-    );
+    house.rentAmount = value.rentAmount;
+    await house.save()
+  
+    const populated = await House.findById(house._id).populate("villaId", "name location");
 
-    if (!updatedHouse) {
-      return res.status(404).json({ message: "House not found" });
-    }
-
-    const populatedHouse = await House.findById(updatedHouse._id).populate("villaId");
-
-    res.status(201).json(populatedHouse);
+    return res.status(201).json(populated);
 
   } catch (error) {
+    console.log(error.message)
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
 export const deleteHouse = async (req, res) => {
     try {
-    const house = await House.findByIdAndDelete(req.params.id);
 
-    if (!house) return res.status(404).json({ message: "House not found" });
+      const { id } = req.params;
+      const house = await House.findById(id);
+      if (!house || house.isDeleted) return res.status(404).json({ success: false, message: "House not found" });
+      
+      house.isDeleted = true;
+      await house.save();
 
-    res.json({ message: "House removed" });
+      return res.json({ message: "House removed" });
     } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
     }

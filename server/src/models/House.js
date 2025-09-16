@@ -28,6 +28,10 @@ const houseSchema = new Schema({
         type:Number,
         required:true
     },
+    isDeleted:{
+        type:Boolean,
+        default:false
+    }
 },{timestamps:true});
 
 houseSchema.pre("save", function (next) {

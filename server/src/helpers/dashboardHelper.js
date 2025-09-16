@@ -11,11 +11,14 @@ export const getMonthlyAggregates = async (month, year, villaId = null) => {
   const endDate = new Date(year, month, 1);
 
   // Villas
-  const villas = villaId ? await Villa.find({ _id: villaId }) : await Villa.find();
-  const totalVillas = villas.length;
+  const [villas, houses] = await Promise.all([
+    villaId
+      ? Villa.find({ _id: villaId, isDeleted: { $ne: true } })
+      : Villa.find({ isDeleted: { $ne: true } }),
+    House.find(villaId ? { villaId, isDeleted: { $ne: true } } : { isDeleted: { $ne: true } }),
+  ]);
 
-  // Houses
-  const houses = await House.find(villaId ? { villaId } : {});
+  const totalVillas = villas.length;
   const totalHouses = houses.length;
   const occupiedHouses = houses.filter((h) => h.isOccupied).length;
   const availableHouses = totalHouses - occupiedHouses;
@@ -23,51 +26,72 @@ export const getMonthlyAggregates = async (month, year, villaId = null) => {
   // Tenants
   const totalTenants = await User.countDocuments({ role: "tenant", isDeleted: false });
 
-  // Rentals
-  const rentals = await Rental.find({
-    ...(villaId && { villaId }),
-    month,
-    year,
-    status: "paid",
-  });
+  const [rentals, electricityRecords, maintenanceRecords] = await Promise.all([
+    Rental.find({
+      ...(villaId && { villaId }),
+      month,
+      year,
+      status: "paid",
+    }),
+    Electricity.find({
+      ...(villaId && { villaId }),
+      date: { $gte: startDate, $lt: endDate },
+    }),
+    MaintenanceRequest.find({
+      ...(villaId && { villaId }),
+      date: { $gte: startDate, $lt: endDate },
+    }),
+  ]);
+
   const monthlyRentCollected = rentals.reduce((sum, r) => sum + (r.rentAmount || 0), 0);
-
-  // Owner rent (houses)
-  const totalOwnerRent = houses.reduce((sum, h) => sum + (h.rentAmount || 0), 0);
-
-  // Electricity
-  const electricityRecords = await Electricity.find({
-    ...(villaId && { villaId }),
-    date: { $gte: startDate, $lt: endDate },
-  });
+  const totalOwnerRent = villas.reduce((sum, v) => sum + (v.price || 0), 0);
   const monthlyElectricity = electricityRecords.reduce((sum, e) => sum + (e.amount || 0), 0);
-
-  // Maintenance
-  const maintenanceRecords = await MaintenanceRequest.find({
-    ...(villaId && { villaId }),
-    date: { $gte: startDate, $lt: endDate },
-  });
   const monthlyMaintenance = maintenanceRecords.reduce((sum, m) => sum + (m.cost || 0), 0);
-
-  // Profit
   const monthlyProfit = monthlyRentCollected - (totalOwnerRent + monthlyElectricity + monthlyMaintenance);
 
-  // For report data (villa-wise)
+  // Map villaId → data for performance
+  const houseMap = new Map();
+  houses.forEach((h) => {
+    const vId = h.villaId.toString();
+    if (!houseMap.has(vId)) houseMap.set(vId, []);
+    houseMap.get(vId).push(h);
+  });
+
+  const rentalMap = new Map();
+  rentals.forEach((r) => {
+    const vId = r.villaId.toString();
+    if (!rentalMap.has(vId)) rentalMap.set(vId, []);
+    rentalMap.get(vId).push(r);
+  });
+
+  const electricityMap = new Map();
+  electricityRecords.forEach((e) => {
+    const vId = e.villaId.toString();
+    if (!electricityMap.has(vId)) electricityMap.set(vId, []);
+    electricityMap.get(vId).push(e);
+  });
+
+  const maintenanceMap = new Map();
+  maintenanceRecords.forEach((m) => {
+    const vId = m.villaId.toString();
+    if (!maintenanceMap.has(vId)) maintenanceMap.set(vId, []);
+    maintenanceMap.get(vId).push(m);
+  });
+
+  // Villa-wise report
   const reportData = villas.map((villa) => {
-    const villaHouses = houses.filter((h) => h.villaId.toString() === villa._id.toString());
-    const villaRentals = rentals.filter((r) => r.villaId.toString() === villa._id.toString());
-    const villaElectricity = electricityRecords
-      .filter((e) => e.villaId.toString() === villa._id.toString())
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const villaMaintenance = maintenanceRecords
-      .filter((m) => m.villaId.toString() === villa._id.toString())
-      .reduce((sum, m) => sum + (m.cost || 0), 0);
-    const villaOwnerRent = villaHouses.reduce((sum, h) => sum + (h.rentAmount || 0), 0);
-    const villaProfit = villaRentals.reduce((sum, r) => sum + (r.rentAmount || 0), 0) - (villaOwnerRent + villaElectricity + villaMaintenance);
+    const vId = villa._id.toString();
+    const villaHouses = houseMap.get(vId) || [];
+    const villaRentals = rentalMap.get(vId) || [];
+    const villaElectricity = (electricityMap.get(vId) || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const villaMaintenance = (maintenanceMap.get(vId) || []).reduce((sum, m) => sum + (m.cost || 0), 0);
+    const villaOwnerRent = villa.price || 0;
+    const villaIncome = villaRentals.reduce((sum, r) => sum + (r.rentAmount || 0), 0);
+    const villaProfit = villaIncome - (villaOwnerRent + villaElectricity + villaMaintenance);
 
     return {
       villaName: villa.name,
-      income: villaRentals.reduce((sum, r) => sum + (r.rentAmount || 0), 0),
+      income: villaIncome,
       ownerRent: villaOwnerRent,
       electricity: villaElectricity,
       maintenance: villaMaintenance,
@@ -76,17 +100,13 @@ export const getMonthlyAggregates = async (month, year, villaId = null) => {
   });
 
   // Totals
-  const totals = reportData.reduce(
-    (acc, r) => {
-      acc.income += r.income;
-      acc.ownerRent += r.ownerRent;
-      acc.electricity += r.electricity;
-      acc.maintenance += r.maintenance;
-      acc.profit += r.profit;
-      return acc;
-    },
-    { income: 0, ownerRent: 0, electricity: 0, maintenance: 0, profit: 0 }
-  );
+  const totals = {
+    income: reportData.reduce((sum, v) => sum + v.income, 0),
+    ownerRent: villas.reduce((sum, v) => sum + (v.price || 0), 0), // ✅ direct from villas
+    electricity: reportData.reduce((sum, v) => sum + v.electricity, 0),
+    maintenance: reportData.reduce((sum, v) => sum + v.maintenance, 0),
+    profit: reportData.reduce((sum, v) => sum + v.profit, 0),
+  };
 
   return {
     summary: {

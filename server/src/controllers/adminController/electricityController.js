@@ -1,27 +1,34 @@
+import Joi from "joi";
 import { Electricity } from "../../models/Electricity.js";
 import { Villa } from "../../models/Villa.js";
+
+
+const createSchema = Joi.object({
+  villaId: Joi.string().required(),
+  amount: Joi.number().min(0).required(),
+  date: Joi.date().optional(),
+});
 
 // Create
 export const createElectricity = async (req, res) => {
   try {
-    const { villaId, amount, date } = req.body;
+    const { error, value } = createSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
-    if (!villaId || !amount || !date) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
+    const { villaId, amount, date } = value;
 
     const villa = await Villa.findById(villaId);
-    if (!villa) return res.status(404).json({ message: "Villa not found" });
+    if (!villa || villa.isDeleted) return res.status(404).json({ success: false, message: "Villa not found" });
 
-    const electricity = new Electricity({ villaId, amount, date });
-    await electricity.save();
+    const bill = new Electricity({ villaId, amount, date: date || new Date() });
+    await bill.save();
 
-    res.status(201).json({
-      _id: electricity._id,
+    return res.status(201).json({
+      _id: bill._id,
       villaName: villa.name,
       villaId: villa._id,
-      amount: electricity.amount,
-      date: electricity.date,
+      amount: bill.amount,
+      date: bill.date,
     });
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -37,7 +44,7 @@ export const getElectricities = async (req, res) => {
     if (month) {
       const [year, mon] = month.split("-");
       const start = new Date(year, mon - 1, 1);
-      const end = new Date(year, mon, 0);
+      const end = new Date(year, mon, 0, 23, 59, 59, 999);
       filter.date = { $gte: start, $lte: end };
     }
 
@@ -53,7 +60,7 @@ export const getElectricities = async (req, res) => {
       date: e.date,
     }));
 
-    res.json(result);
+    return res.json(result);
   } catch (error) {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -73,7 +80,7 @@ export const updateElectricity = async (req, res) => {
 
     if (!updated) return res.status(404).json({ message: "Electricity not found" });
 
-    res.json({
+    return res.json({
       _id: updated._id,
       villaName: updated.villaId?.name || "-",
       villaId: updated.villaId?._id || null,

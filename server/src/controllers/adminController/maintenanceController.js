@@ -1,7 +1,18 @@
 // controllers/maintenanceController.js
+import Joi from "joi";
 import { MaintenanceRequest } from "../../models/MaintenanceRequest.js";
 import { Villa } from "../../models/Villa.js";
 import { House } from "../../models/House.js";
+
+
+const createSchema = Joi.object({
+  villaId: Joi.string().required(),
+  houseId: Joi.string().required(),
+  tenantName: Joi.string().optional().allow(""),
+  date: Joi.date().optional(),
+  issue: Joi.string().required(),
+  cost: Joi.number().min(0).required(),
+});
 
 // 🔹 Helper to format maintenance consistently
 const formatMaintenance = (m) => ({
@@ -19,20 +30,24 @@ const formatMaintenance = (m) => ({
 // 🔹 Add new maintenance
 export const createMaintenance = async (req, res) => {
   try {
-    const { villaId, houseId, tenantName, date, issue, cost } = req.body;
+    const { error, value } = createSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
+
+    const { villaId, houseId, tenantName, date, issue, cost } = value;
 
     const villa = await Villa.findById(villaId);
-    const house = await House.findById(houseId);
+    const house = await House.findById(houseId).populate("currentTenantUserId", "name");
 
-    if (!villa || !house) {
-      return res.status(400).json({ message: "Invalid villa or house" });
-    }
+    if (!villa || villa.isDeleted) return res.status(400).json({ success: false, message: "Invalid villa" });
+    if (!house || house.isDeleted) return res.status(400).json({ success: false, message: "Invalid house" });
+
+    const resolvedTenantName = tenantName || house.currentTenantUserId?.name || "";
 
     const maintenance = new MaintenanceRequest({
       villaId,
       houseId,
-      tenantName,
-      date,
+      tenantName: resolvedTenantName,
+      date: date || new Date(),
       issue,
       cost,
     });
@@ -44,7 +59,7 @@ export const createMaintenance = async (req, res) => {
       .populate("villaId", "name")
       .populate("houseId", "number currentTenantUserId");
 
-    res.status(201).json(formatMaintenance(populated));
+    return res.status(201).json(formatMaintenance(populated));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -59,8 +74,8 @@ export const getMaintenances = async (req, res) => {
 
     if (month) {
       const [year, mon] = month.split("-");
-      const start = new Date(year, mon - 1, 1);
-      const end = new Date(year, mon, 0, 23, 59, 59);
+      const start = new Date(Number(year), Number(mon) - 1, 1);
+      const end = new Date(Number(year), Number(mon), 0, 23, 59, 59, 99);
       filter.date = { $gte: start, $lte: end };
     }
 
@@ -69,7 +84,7 @@ export const getMaintenances = async (req, res) => {
       .populate("houseId", "number currentTenantUserId")
       .sort({ date: -1 });
 
-    res.json(maintenances.map(formatMaintenance));
+    return res.json(maintenances.map(formatMaintenance));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });

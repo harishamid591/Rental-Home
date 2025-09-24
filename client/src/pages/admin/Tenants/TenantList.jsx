@@ -100,6 +100,9 @@ const TenantList = () => {
 
       dispatch(addTenant(res.data));
 
+      const houseRes = await axios.get(API_URI + "/api/houses", { withCredentials: true });
+      setHouses(houseRes.data);
+
       toast.success("Tenant account created successfully ✅");
 
       setFormData({
@@ -239,7 +242,7 @@ const TenantList = () => {
               <th className="px-4 py-3 text-left">Contact</th>
               <th className="px-4 py-3 text-left">Villa</th>
               <th className="px-4 py-3 text-left">House</th>
-              <th className="px-4 py-3 text-left">Rent</th>
+              <th className="px-4 py-3 text-left">Rent(QR)</th>
               <th className="px-4 py-3 text-left">Start Date</th> {/* ✅ new col */}
               <th className="px-4 py-3 text-left">Actions</th>
             </tr>
@@ -262,8 +265,8 @@ const TenantList = () => {
                     <td className="px-4 py-3">{profile.qatarId || "-"}</td>
                     <td className="px-4 py-3">{profile.contact || "-"}</td>
                     <td className="px-4 py-3">{villa.name || "-"}</td>
-                    <td className="px-4 py-3">{house.number || "-"}</td>
-                    <td className="px-4 py-3">{house.rentAmount ? `QR ${house.rentAmount}` : "-"}</td>
+                    <td className="px-4 py-3 text-center">{house.number || "-"}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-600 text-center">{house.rentAmount ? ` ${house.rentAmount.toLocaleString()}` : "-"}</td>
                     <td className="px-4 py-3">{profile.startDate ? new Date(profile.startDate).toLocaleDateString() : "-"}</td>
                     <td className="px-4 py-3 flex gap-2">
                       <button

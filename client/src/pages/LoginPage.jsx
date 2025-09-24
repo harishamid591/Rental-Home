@@ -39,13 +39,11 @@ const LoginPage = () => {
         { withCredentials: true }
       );
 
-
       dispatch(setUser(res.data));
 
-       // Role-based redirect
-       if (res.data.role === "admin") navigate("/admin/dashboard");
-       else if (res.data.role === "tenant") navigate("/dashboard");
-       else navigate("/"); // fallback
+
+      if (res.data.role === "admin") navigate("/admin/dashboard");
+      else if (res.data.role === "tenant") navigate("/dashboard");
 
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");

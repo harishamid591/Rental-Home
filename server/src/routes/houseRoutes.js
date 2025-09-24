@@ -13,7 +13,7 @@ router.get("/",protect,adminOnly, getHouses);
 router.post("/",protect,adminOnly, createHouses);
 
 router.put("/:id",protect,adminOnly, updateHouse);
-router.delete("/:id", deleteHouse);
+router.delete("/:id",protect,adminOnly, deleteHouse);
 
 
 

@@ -6,7 +6,6 @@ const router = express.Router();
 
 
 
-// ✅ Tenants & admins can view villas
 router.get("/", protect,adminOnly, getVillas);
 
 // POST /api/villas/add (Admin only)

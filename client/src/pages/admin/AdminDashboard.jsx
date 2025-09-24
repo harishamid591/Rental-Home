@@ -43,6 +43,9 @@ const Dashboard = () => {
         const resSummary = await axios.get(`${API_URI}/api/adminDashboard`, {
           withCredentials: true,
         });
+
+        console.log(resSummary)
+
         setSummary(resSummary.data.summary);
 
         // Fetch yearly financials

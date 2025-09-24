@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom"
 import ProtectedRoute from "../components/ProtectedRoute";
 import Dashboard from "../pages/user/Dashboard";
+import UserRentalsPage from "../pages/user/UserRentalsPage";
 
 
 const TenantRoutes = ()=>{
@@ -10,7 +11,7 @@ const TenantRoutes = ()=>{
                 path="/dashboard"
                 element={
                     <ProtectedRoute allowedRoles={["tenant"]}>
-                        <Dashboard />
+                        <UserRentalsPage />
                     </ProtectedRoute>
                 }
             />

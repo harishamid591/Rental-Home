@@ -92,7 +92,7 @@ const ReportPage = () => {
     <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 w-full">
-        <h1 className="text-2xl font-bold text-gray-800">Monthly Report – {monthLabel}</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Report – {monthLabel}</h1>
 
         <div className="flex flex-wrap gap-3">
           <input

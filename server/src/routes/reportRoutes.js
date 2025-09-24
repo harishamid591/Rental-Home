@@ -1,11 +1,13 @@
-// backend/routes/reportRoutes.js
+
 import express from "express";
 import { getReport, exportReportPdf } from "../controllers/adminController/reportController.js";
+import { adminOnly, protect } from "../middleware/authMiddleware.js";
+
 
 const router = express.Router();
 
-router.get("/", getReport);
-router.get("/export", exportReportPdf);
+router.get("/",protect,adminOnly, getReport);
+router.get("/export",protect,adminOnly, exportReportPdf);
 
 
 

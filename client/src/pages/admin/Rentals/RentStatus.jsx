@@ -41,13 +41,19 @@ const RentalPage = () => {
   // Load rentals based on filters
   useEffect(() => {
     const fetchRentals = async () => {
-      if (!selectedVilla) return;
+ 
       setLoading(true);
+      if (!selectedVilla) {
+        setRentals([]);   // no villa selected → empty list
+        setLoading(false);
+        return;
+      }
       try {
         const res = await axios.get(
           `${API_URI}/api/rentals?villaId=${selectedVilla}&status=${statusFilter}&month=${month}`,
           { withCredentials: true }
         );
+        console.log(res)
         setRentals(res.data);
       } catch (err) {
         console.error(err);

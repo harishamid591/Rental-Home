@@ -14,6 +14,8 @@ const getRentalsSchema = Joi.object({
 export const getRentals = async (req, res) => {
     try {
 
+      console.log('heyyy')
+
       const { error, value } = getRentalsSchema.validate(req.query);
       if (error) return res.status(400).json({ success: false, message: error.message });
 

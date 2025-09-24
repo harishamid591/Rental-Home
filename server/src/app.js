@@ -15,15 +15,26 @@ import reportRoutes from "./routes/reportRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 
+
+import userRoutes from "./routes/userRoutes/userRoutes.js";
+
+
 const app = express();
 
 
-app.use(cors({origin:"http://localhost:5173", credentials:true}));
+app.use(cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  }));
 
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
-app.use(morgan("dev"));
+if (process.env.NODE_ENV === "development") {
+    app.use(morgan("dev"));
+  } else {
+    app.use(morgan("combined"));
+  }
 
 
 
@@ -37,5 +48,21 @@ app.use("/api/maintenance",maintenanceRoutes)
 app.use("/api/electricity",electricityRoutes)
 app.use("/api/reports",reportRoutes)
 app.use("/api/adminDashboard",dashboardRoutes)
+
+app.use("/api/user",userRoutes)
+
+// Not found handler
+app.use((req, res, next) => {
+    res.status(404).json({ message: "Route not found" });
+  });
+  
+  // Error handler
+  app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(err.status || 500).json({
+      success: false,
+      message: err.message || "Something went wrong",
+    });
+  });
 
 export default app;
